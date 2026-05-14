@@ -120,7 +120,26 @@ def convolutional_encode(bits):
     if not np.all((bits == 0) | (bits == 1)):
         raise ValueError('bits 只能包含 0 或 1')
 
-    raise NotImplementedError('选做：请实现卷积码编码')
+    # 添加2个尾比特0，使编码器最终回到全零状态
+    padded_bits = np.concatenate([bits, np.array([0, 0], dtype=int)])
+    
+    # 初始化移位寄存器：[s1, s0]，初始状态全零
+    shift_reg = np.array([0, 0], dtype=int)
+    encoded = []
+    
+    for bit in padded_bits:
+        # 计算两个输出比特：g1=111, g2=101
+        v1 = bit ^ shift_reg[0] ^ shift_reg[1]
+        v2 = bit ^ shift_reg[1]
+        
+        encoded.append(v1)
+        encoded.append(v2)
+        
+        # 更新移位寄存器
+        shift_reg = np.array([bit, shift_reg[0]], dtype=int)
+    
+    return np.array(encoded, dtype=int)
+
 
 
 def viterbi_decode_hard(received_bits):
@@ -130,8 +149,71 @@ def viterbi_decode_hard(received_bits):
     received_bits = np.asarray(received_bits, dtype=int)
     if len(received_bits) % 2 != 0:
         raise ValueError('卷积码接收序列长度必须是 2 的倍数')
-
-    raise NotImplementedError('选做：请实现 Viterbi 硬判决译码')
+    
+    # 将接收序列按每2个比特分组
+    received = received_bits.reshape(-1, 2)
+    n_steps = len(received)
+    
+    # 状态定义：4个状态 0(00), 1(01), 2(10), 3(11)
+    n_states = 4
+    
+    # 初始化路径度量：初始状态0的度量为0，其他为无穷大
+    path_metrics = np.full(n_states, np.inf)
+    path_metrics[0] = 0
+    
+    # 初始化回溯指针
+    back_pointers = np.zeros((n_steps, n_states), dtype=int)
+    
+    # 遍历每个时刻
+    for t in range(n_steps):
+        current_rx = received[t]
+        new_metrics = np.full(n_states, np.inf)
+        
+        # 遍历每个当前状态
+        for current_state in range(n_states):
+            if path_metrics[current_state] == np.inf:
+                continue
+            
+            # 尝试输入0和1两种情况
+            for input_bit in [0, 1]:
+                # 计算下一个状态
+                next_state = ((current_state << 1) | input_bit) & 0b11
+                
+                # 计算当前状态和输入对应的期望输出
+                s1 = (current_state >> 1) & 1
+                s0 = current_state & 1
+                expected_v1 = input_bit ^ s1 ^ s0
+                expected_v2 = input_bit ^ s0
+                expected = np.array([expected_v1, expected_v2])
+                
+                # 计算汉明距离
+                hamming_dist = np.sum(current_rx != expected)
+                
+                # 更新路径度量
+                total_metric = path_metrics[current_state] + hamming_dist
+                if total_metric < new_metrics[next_state]:
+                    new_metrics[next_state] = total_metric
+                    back_pointers[t, next_state] = current_state
+        
+        # 更新路径度量为下一时刻的度量
+        path_metrics = new_metrics
+    
+    # 回溯：从全零状态开始
+    decoded = []
+    current_state = 0
+    
+    for t in range(n_steps - 1, -1, -1):
+        prev_state = back_pointers[t, current_state]
+        # 提取输入比特：当前状态的最高位就是输入比特
+        input_bit = (current_state >> 1) & 1
+        decoded.append(input_bit)
+        current_state = prev_state
+    
+    # 反转得到正确顺序，并去掉最后2个尾比特
+    decoded = np.array(decoded[::-1], dtype=int)
+    decoded = decoded[:-2]
+    
+    return decoded
 
 
 def run_coding_demo():
