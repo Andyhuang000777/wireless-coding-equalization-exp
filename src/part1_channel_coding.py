@@ -48,8 +48,9 @@ def hamming74_encode(bits):
     if not np.all((bits == 0) | (bits == 1)):
         raise ValueError('bits 只能包含 0 或 1')
 
-    # TODO: 将 bits reshape 为 (-1, 4)，再与 HAMMING_G 相乘并对 2 取模。
-    raise NotImplementedError('请实现 Hamming(7,4) 编码')
+    blocks = bits.reshape(-1, 4)
+    encoded_blocks = blocks @ HAMMING_G % 2
+    return encoded_blocks.flatten()
 
 
 def hamming74_syndrome(codewords):
@@ -70,8 +71,8 @@ def hamming74_syndrome(codewords):
     if codewords.shape[1] != 7:
         raise ValueError('每个 Hamming(7,4) 码字长度必须为 7')
 
-    # TODO: 计算 s = r H^T mod 2。
-    raise NotImplementedError('请实现伴随式计算')
+    syndromes = codewords @ HAMMING_H.T % 2
+    return syndromes
 
 
 def hamming74_decode(received):
@@ -94,8 +95,19 @@ def hamming74_decode(received):
     if received.ndim != 1 or len(received) % 7 != 0:
         raise ValueError('received 必须是一维数组，长度为 7 的倍数')
 
-    # TODO: 使用 hamming74_syndrome 完成单比特纠错，并返回前 4 个信息位。
-    raise NotImplementedError('请实现 Hamming(7,4) 译码')
+    codewords = received.reshape(-1, 7)
+    syndromes = hamming74_syndrome(codewords)
+
+    for i in range(codewords.shape[0]):
+        s = syndromes[i]
+        if not np.all(s == 0):
+            for col_idx in range(7):
+                if np.array_equal(s, HAMMING_H[:, col_idx]):
+                    codewords[i, col_idx] ^= 1
+                    break
+
+    decoded_bits = codewords[:, :4].flatten()
+    return decoded_bits
 
 
 def convolutional_encode(bits):
@@ -108,7 +120,6 @@ def convolutional_encode(bits):
     if not np.all((bits == 0) | (bits == 1)):
         raise ValueError('bits 只能包含 0 或 1')
 
-    # TODO: 选做任务，可参考课件第6章卷积码部分。
     raise NotImplementedError('选做：请实现卷积码编码')
 
 
@@ -120,7 +131,6 @@ def viterbi_decode_hard(received_bits):
     if len(received_bits) % 2 != 0:
         raise ValueError('卷积码接收序列长度必须是 2 的倍数')
 
-    # TODO: 选做任务，可使用汉明距离作为路径度量。
     raise NotImplementedError('选做：请实现 Viterbi 硬判决译码')
 
 

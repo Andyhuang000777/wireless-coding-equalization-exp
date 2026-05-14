@@ -38,8 +38,23 @@ def estimate_zf_equalizer(channel, num_taps):
     if num_taps < 1:
         raise ValueError('num_taps 必须为正整数')
 
-    # TODO: 构造卷积矩阵并求解 ZF 均衡器抽头。
-    raise NotImplementedError('请实现 ZF 均衡器估计')
+    # ===================== 你要写的代码开始 =====================
+    L = len(channel)
+    N = num_taps
+    
+    # 构造卷积矩阵 A
+    A = np.zeros((L + N - 1, N))
+    for i in range(N):
+        A[i:i+L, i] = channel
+    
+    # 构造目标冲激响应 d，中心位置为1
+    d = np.zeros(L + N - 1)
+    d[(L + N - 2) // 2] = 1.0
+    
+    # 求解最小二乘解
+    taps, _, _, _ = np.linalg.lstsq(A, d, rcond=None)
+    # ===================== 你要写的代码结束 =====================
+    return taps
 
 
 def apply_fir_filter(signal, taps):
@@ -58,8 +73,12 @@ def apply_fir_filter(signal, taps):
     if signal.ndim != 1 or taps.ndim != 1:
         raise ValueError('signal 和 taps 必须是一维数组')
 
-    # TODO: 使用 np.convolve，并截取与 signal 等长的输出。
-    raise NotImplementedError('请实现 FIR 滤波')
+    # ===================== 你要写的代码开始 =====================
+    # 全卷积后截取前len(signal)个样本
+    full_conv = np.convolve(signal, taps, mode='full')
+    filtered = full_conv[:len(signal)]
+    # ===================== 你要写的代码结束 =====================
+    return filtered
 
 
 def lms_equalizer(rx_train, tx_train, num_taps, step_size=0.01):
@@ -89,8 +108,34 @@ def lms_equalizer(rx_train, tx_train, num_taps, step_size=0.01):
     if num_taps < 1:
         raise ValueError('num_taps 必须为正整数')
 
-    # TODO: 实现 LMS 自适应均衡训练。
-    raise NotImplementedError('请实现 LMS 均衡器')
+     # ===================== 你要写的代码开始 =====================
+    N = num_taps
+    n_samples = len(rx_train)
+    
+    # 初始化抽头：中心抽头为1，其余为0
+    taps = np.zeros(N)
+    taps[N // 2] = 1.0
+    
+    errors = np.zeros(n_samples - N + 1)
+    
+    # LMS迭代
+    for i in range(N - 1, n_samples):
+        # 构造当前输入向量（倒序以匹配卷积顺序）
+        x = rx_train[i - N + 1:i + 1][::-1]
+        
+        # 计算输出
+        y = np.dot(taps, x)
+        
+        # 计算误差
+        e = tx_train[i] - y
+        
+        # 更新抽头
+        taps = taps + step_size * e * x
+        
+        # 保存误差
+        errors[i - N + 1] = e
+    # ===================== 你要写的代码结束 =====================
+    return taps, errors
 
 
 def run_equalization_demo():
